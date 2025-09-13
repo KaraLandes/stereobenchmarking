@@ -15,6 +15,10 @@ COLLECTION = {
             'cfgclass':FoundationStereoConfig,
             'class':FoundationStereoModel
         },
+        'LightStereoModel':{
+            'cfgclass':LightStereoConfig,
+            'class':LightStereoModel
+        },
     },
     'runners':{
         'InferenceRunner':{

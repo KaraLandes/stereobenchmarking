@@ -12,9 +12,8 @@ import warnings
 warnings.filterwarnings("ignore")
 
 
-from configurators.inference_conf_foundationstereo import ALL_CONFIGS
+from configurators.inference_conf_lightstereo import ALL_CONFIGS
 
-BASE_DIR = 'source/evaluation/foundationstereo_kitti12-training_vitlarge'
 for INFERENCE_CONFIG in tqdm(ALL_CONFIGS):
     try:
         # --------------------------------------------------------
@@ -36,25 +35,43 @@ for INFERENCE_CONFIG in tqdm(ALL_CONFIGS):
             if cfg_file is None:
                 raise FileNotFoundError(f"No config file (.yml/.yaml/.json) found in {chkpt_dir}")
 
-            ckpt_file = next(chkpt_dir.glob("*.pth"))
+            ckpt_file = next(
+                (f for ext in ("*.pth", "*.ckpt") for f in chkpt_dir.glob(ext)),
+                None
+            )
+            if ckpt_file is None:
+                raise FileNotFoundError(f"No checkpoint file (.pth/.ckpt) found in {chkpt_dir}")
 
             # Load YAML config
             cfg_raw = OmegaConf.load(cfg_file)
 
             # Map to dataclass
-            cfg = ModelCfgClass(
-                max_disp=int(cfg_raw.get("max_disp", 192)),
-                corr_radius=int(cfg_raw.get("corr_radius", 4)),
-                corr_levels=int(cfg_raw.get("corr_levels", 2)),
-                n_gru_layers=int(cfg_raw.get("n_gru_layers", 3)),
-                n_downsample=int(cfg_raw.get("n_downsample", 3)),
-                hidden_dims=list(cfg_raw.get("hidden_dims", [128, 128, 128])),
-                vit_size=str(cfg_raw.get("vit_size", "vitl")),
-                mixed_precision=bool(cfg_raw.get("mixed_precision", True)),
-                low_memory=bool(cfg_raw.get("low_memory", False)),
-                weights=str(ckpt_file),
-                device="cuda" if torch.cuda.is_available() else "cpu",
-            )
+            if model_name == 'FoundationStereoModel':
+                cfg = ModelCfgClass(
+                        max_disp=int(cfg_raw.get("max_disp", 192)),
+                        corr_radius=int(cfg_raw.get("corr_radius", 4)),
+                        corr_levels=int(cfg_raw.get("corr_levels", 2)),
+                        n_gru_layers=int(cfg_raw.get("n_gru_layers", 3)),
+                        n_downsample=int(cfg_raw.get("n_downsample", 3)),
+                        hidden_dims=list(cfg_raw.get("hidden_dims", [128, 128, 128])),
+                        vit_size=str(cfg_raw.get("vit_size", "vitl")),
+                        mixed_precision=bool(cfg_raw.get("mixed_precision", True)),
+                        low_memory=bool(cfg_raw.get("low_memory", False)),
+                        weights=str(ckpt_file),
+                        device="cuda" if torch.cuda.is_available() else "cpu",
+                    )
+            elif model_name == 'LightStereoModel':
+                cfg = ModelCfgClass(
+                        max_disp=int(cfg_raw.MODEL.get("MAX_DISP", 192)),
+                        left_att=bool(cfg_raw.MODEL.get("LEFT_ATT", True)),
+                        backbone=str(cfg_raw.MODEL.get("BACKBONE", "MobileNetv2")),
+                        aggregation_blocks=tuple(cfg_raw.MODEL.get("AGGREGATION_BLOCKS", [1, 2, 4])),
+                        expanse_ratio=int(cfg_raw.MODEL.get("EXPANSE_RATIO", 2)),
+                        weights=str(ckpt_file),
+                        device="cuda" if torch.cuda.is_available() else "cpu",
+                        eval_mode=bool(INFERENCE_CONFIG['model']['from_chkpt'].get("eval_mode", True)),
+                        test_mode=bool(INFERENCE_CONFIG['model']['from_chkpt'].get("test_mode", True)),
+                    )
 
             model = ModelClass(cfg)
 
@@ -105,8 +122,8 @@ for INFERENCE_CONFIG in tqdm(ALL_CONFIGS):
         RunnerCfgClass = runner_cfg_entry["cfgclass"]
 
         runner_cfg = RunnerCfgClass(**INFERENCE_CONFIG["runner"]["hyperparameters"])
-        runner_cfg.target_dir = os.path.join(BASE_DIR,
-                                            INFERENCE_CONFIG['config_name'])
+        runner_cfg.target_dir = os.path.join(INFERENCE_CONFIG["runner"]["hyperparameters"]['target_dir'],
+                                             INFERENCE_CONFIG['config_name'])
 
         # Build runner
         RunnerClass = runner_cfg_entry["class"]
@@ -119,8 +136,7 @@ for INFERENCE_CONFIG in tqdm(ALL_CONFIGS):
         # R.U.N.
         # --------------------------------------------------------
         runner.run()
-        collect_metrics(BASE_DIR, 
-                        out_csv=os.path.join(BASE_DIR, "all_metrics.csv"))
+        collect_metrics(INFERENCE_CONFIG["runner"]["hyperparameters"]['target_dir'])
     except Exception as e:
         print(f"Failed {INFERENCE_CONFIG['config_name']}")
         raise e

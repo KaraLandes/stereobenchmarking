@@ -2,7 +2,8 @@ import os
 import json
 import csv
 
-def collect_metrics(root_dir: str, out_csv: str = "all_metrics.csv"):
+def collect_metrics(root_dir: str):
+    out_csv = os.path.join(root_dir,"all_metrics.csv")
     rows = []
     fieldnames = set()
 
@@ -33,7 +34,3 @@ def collect_metrics(root_dir: str, out_csv: str = "all_metrics.csv"):
         writer.writerows(rows)
 
     print(f"Collected {len(rows)} experiments into {out_csv}")
-
-# Example usage
-if __name__ == "__main__":
-    collect_metrics("source/evaluation/foundationstereo_kitti12-training")

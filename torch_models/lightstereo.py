@@ -1,6 +1,7 @@
 # torch_models/lightstereo.py
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
+from omegaconf import OmegaConf
 import torch
 import torch.nn as nn
 import os
@@ -73,6 +74,8 @@ class LightStereoModel(nn.Module):
             "EXPANSE_RATIO": cfg.expanse_ratio,
         }
         os_cfg.update(cfg.extra)
+        os_cfg = OmegaConf.create(os_cfg)
+
 
         self.net = OS_LightStereo(os_cfg)
 
@@ -84,13 +87,25 @@ class LightStereoModel(nn.Module):
 
         self.to(cfg.device)
 
-    def load_weights(self, path: str, strict: bool = False):
-        print(f"Loading LightStereo weights from {path}")
-        state = torch.load(path, map_location="cpu")
-        # handle checkpoints saved with trainer dict wrapping
+    def load_weights(self, path: str, strict: bool = True):
+        state = torch.load(path, map_location="cpu", weights_only=False)
+
+        # handle different checkpoint formats
         if "model" in state:
-            state = state["model"]
-        self.net.load_state_dict(state, strict=strict)
+            state_dict = state["model"]
+        elif "model_state" in state:
+            state_dict = state["model_state"]
+        elif "state_dict" in state:
+            state_dict = state["state_dict"]
+        else:
+            state_dict = state  # assume already a pure state_dict
+
+        missing, unexpected = self.net.load_state_dict(state_dict, strict=strict)
+        print(f"Loaded weights from {path}")
+        if missing:
+            print("  Missing keys:", missing)
+        if unexpected:
+            print("  Unexpected keys:", unexpected)
 
     @torch.no_grad()
     def forward(self, left: torch.Tensor, right: torch.Tensor) -> torch.Tensor:

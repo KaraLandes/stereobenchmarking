@@ -7,23 +7,12 @@ BASE_CONFIG = {
         'from_chkpt': {
             'on': True,  # if true then instantiate from chkpt
             'chkpt_path': 'source/checkpoints/fouindationstereo/large',
-            
-            # # backbone / architecture
-            # 'vit_size': 'vitl',   # change to vitb, vitl, etc. to match checkpoint
-            # 'max_disp': 416,
-            # 'corr_implementation': 'reg',
-            # 'corr_levels': 2,
-            # 'corr_radius': 4,
-            # 'hidden_dims': [128, 128, 128],
-            # 'n_downsample': 2,
-            # 'n_gru_layers': 3,
-            # 'slow_fast_gru': False,
 
-            # # inference & memory
-            # 'iters': 12,               # forward call iterations
-            # 'hierarchical': True,
-            # 'small_ratio': 0.5,
-            # 'low_memory': False,
+            #in the forward call
+            "iters": 12,
+            "hierarchical": True,
+            "small_ratio": 0.5,
+            "low_memory": True,
         },
         'from_hyperparams': {
             'on': False,  # set True if training from scratch

@@ -3,30 +3,28 @@ import itertools
 
 BASE_CONFIG = {
     'model': {
-        'name': 'FoundationStereoModel',
+        'name': 'LightStereoModel',
         'from_chkpt': {
             'on': True,  # if true then instantiate from chkpt
-            'chkpt_path': 'source/checkpoints/fouindationstereo/large',
-            
-            # # backbone / architecture
-            # 'vit_size': 'vitl',   # change to vitb, vitl, etc. to match checkpoint
-            # 'max_disp': 416,
-            # 'corr_implementation': 'reg',
-            # 'corr_levels': 2,
-            # 'corr_radius': 4,
-            # 'hidden_dims': [128, 128, 128],
-            # 'n_downsample': 2,
-            # 'n_gru_layers': 3,
-            # 'slow_fast_gru': False,
+            'chkpt_path': 'source/checkpoints/lightstereo/l',  # <-- adjust
 
-            # # inference & memory
-            # 'iters': 12,               # forward call iterations
-            # 'hierarchical': True,
-            # 'small_ratio': 0.5,
-            # 'low_memory': False,
+            # runtime args that go into LightStereoConfig
+            'eval_mode': True,
+            'test_mode': True,
+            'device': "cuda",
         },
         'from_hyperparams': {
             'on': False,  # set True if training from scratch
+            'hyperparameters': {
+                'max_disp': 192,
+                'left_att': True,
+                'backbone': "MobileNetv2",   # or "EfficientNetv2"
+                'aggregation_blocks': (1, 2, 4),
+                'expanse_ratio': 4,
+                'eval_mode': True,
+                'test_mode': True,
+                'device': "cuda",
+            }
         }
     },
     'dataset': {
@@ -36,16 +34,16 @@ BASE_CONFIG = {
             'split': 'training',          # "training" or "testing"
             'use_color': True,            # colored_0/1 instead of image_0/1
             'gt_type': 'disp_occ',        # disparity type (only training split)
-            'resize_to': None,            # keep KITTI native resolution
+            'resize_to': None,            # LightStereo was trained on Images 256*512
             'sample_transform': None,
             'target_transform': None,
             'augmentation': None,
         }
     },
     'runner': {
-        'name': 'FoundationStereoEvaluationRunner',
+        'name': 'LightStereoEvaluationRunner',
         'hyperparameters': {
-            'target_dir': 'source/evaluation/foundationstereo_kitti12-training',
+            'target_dir': 'source/evaluation/lightstereo_kitti12-training_l',
             'batch_size': 1,
             'num_workers': 12,
             'device': "cuda"
@@ -60,20 +58,16 @@ BASE_CONFIG = {
 GRID = {
     'dataset': {
         "hyperparameters": {
-            'resize_to': [(384,1248),(192,624)]
+            'resize_to': [(256, 512)] #! LightStereo checkpoints we have were trained on 256x512
         }
     },
     "model": {
         "from_chkpt": {
-            "iters": [2, 12],
-            "hierarchical": [True, False],
-            "small_ratio": [0.5, 1.0],
-            "low_memory": [False, True],
         }
     },
     "runner": {
         "hyperparameters": {
-            "batch_size": [1, 3],
+            "batch_size": [1, 5],
         }
     }
 }
