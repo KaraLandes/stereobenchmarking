@@ -56,7 +56,7 @@ class FoundationStereoConfig:
     hidden_dims: Optional[List[int]] = None
 
     # Vision foundation backbone
-    vit_size: str = "vits"         # {'vits','vitb','vitl'}
+    vit_size: str = "vitl"         # {'vits','vitb','vitl'}
     mixed_precision: bool = True
     low_memory: bool = False       # default forward flag
 
@@ -64,6 +64,13 @@ class FoundationStereoConfig:
     device: str = "cuda"
     eval_mode: bool = True
     weights: Optional[str] = None  # path to .pth/.pt (state_dict or wrapped)
+
+    # Forward_call
+    iters: int = 12
+    hierarchical: bool = True
+    small_ratio: float = 0.5
+    test_mode: bool = True
+    low_memory: Optional[bool] = None
 
     def __post_init__(self):
         if self.hidden_dims is None:
@@ -73,6 +80,12 @@ class FoundationStereoConfig:
                 f"hidden_dims length ({len(self.hidden_dims)}) must equal n_gru_layers ({self.n_gru_layers})"
             )
 
+    def __getitem__(self, key):
+        return getattr(self, key)
+
+    def get(self, key, default=None):
+        return getattr(self, key, default)
+    
     # The official model reads args like a dict; provide a compatible mapping.
     def to_args(self) -> Dict[str, Any]:
         return {
@@ -103,8 +116,8 @@ class FoundationStereoModel(nn.Module):
     def __init__(self, cfg: FoundationStereoConfig):
         super().__init__()
         self.cfg = cfg
-        args = cfg.to_args()
-        self.net = _OfficialFoundationStereo(args)
+        # args = cfg.to_args()
+        self.net = _OfficialFoundationStereo(cfg)#! args 
 
         if cfg.weights:
             self.load_weights(cfg.weights)
@@ -114,23 +127,29 @@ class FoundationStereoModel(nn.Module):
         if cfg.eval_mode:
             self.net.eval()
 
-    def load_weights(self, path: str, strict: bool = False):
-        state = torch.load(path, map_location="cpu")
-        if isinstance(state, dict) and "state_dict" in state:
-            state = state["state_dict"]
-        self.net.load_state_dict(state, strict=strict)
+    def load_weights(self, path: str, strict: bool = True):
+        state = torch.load(path, map_location="cpu", weights_only=False)
+
+        # handle different checkpoint formats
+        if "model" in state:
+            state_dict = state["model"]
+        elif "state_dict" in state:
+            state_dict = state["state_dict"]
+        else:
+            state_dict = state  # assume already a pure state_dict
+
+        missing, unexpected = self.net.load_state_dict(state_dict, strict=strict)
+        print(f"Loaded weights from {path}")
+        if missing:
+            print("  Missing keys:", missing)
+        if unexpected:
+            print("  Unexpected keys:", unexpected)
 
     @torch.inference_mode()
     def forward(
         self,
         left: torch.Tensor,
         right: torch.Tensor,
-        *,
-        iters: int = 12,
-        hierarchical: bool = True,
-        small_ratio: float = 0.5,
-        test_mode: bool = True,
-        low_memory: Optional[bool] = None,
     ) -> torch.Tensor:
         """
         Args:
@@ -140,6 +159,12 @@ class FoundationStereoModel(nn.Module):
         Returns:
             disp: [B,1,H,W] float disparity in pixels
         """
+        iters = self.cfg['iters']
+        hierarchical = self.cfg['hierarchical']
+        small_ratio = self.cfg['small_ratio']
+        test_mode = self.cfg['test_mode']
+        low_memory = self.cfg['low_memory']
+
         dev = next(self.net.parameters()).device
         left = left.to(dev, non_blocking=True)
         right = right.to(dev, non_blocking=True)
@@ -162,7 +187,3 @@ class FoundationStereoModel(nn.Module):
         return disp
 
 
-__all__ = [
-    "FoundationStereoConfig",
-    "FoundationStereoModel",
-]

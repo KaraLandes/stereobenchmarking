@@ -175,7 +175,6 @@ class Kitti12BaseDataset(Dataset):
         if cfg.split == "training":
             cand = split_dir / cfg.gt_type
             if not cand.is_dir():
-                # fallback to the other GT if available
                 alt = "disp_occ" if cfg.gt_type == "disp_noc" else "disp_noc"
                 if (split_dir / alt).is_dir():
                     cand = split_dir / alt
@@ -187,24 +186,26 @@ class Kitti12BaseDataset(Dataset):
 
         # Build file list using left images as anchor
         left_pngs = sorted(self.left_dir.glob("*.png"))
+
+        # ⚡ Only keep *_10.png frames (GT exists only for those in KITTI12 training)
+        if cfg.split == "training":
+            left_pngs = [p for p in left_pngs if p.stem.endswith("_10")]
+
         if len(left_pngs) == 0:
-            raise FileNotFoundError(f"No PNGs found in {self.left_dir}")
+            raise FileNotFoundError(f"No valid *_10.png left images found in {self.left_dir}")
 
         # Ensure right images exist for each left
         self.samples: List[Dict[str, Path]] = []
         for lp in left_pngs:
-            name = lp.name  # e.g., 000000_10.png
-            rp = self.right_dir / name
+            name = lp.name
+            rp = self.right_dir / name.replace("_10", "_11")
             if not rp.is_file():
-                # Allow some codebases that use _10/_11 asymmetric names;
-                # but KITTI12 typically matches names directly.
                 raise FileNotFoundError(f"Right image missing for {lp}: {rp}")
 
             dp = None
             if self.disp_dir is not None:
                 dp = self.disp_dir / name
                 if not dp.is_file():
-                    # Some datasets may omit a few disp files; enforce strictness here.
                     raise FileNotFoundError(f"Disparity GT missing for {lp}: {dp}")
 
             self.samples.append(
@@ -212,10 +213,10 @@ class Kitti12BaseDataset(Dataset):
                     "left": lp,
                     "right": rp,
                     "disp": dp,  # None in testing
-                    "stem": lp.stem,  # basename without .png
+                    "stem": lp.stem,
                 }
             )
-
+    
     def __len__(self) -> int:
         return len(self.samples)
 

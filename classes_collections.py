@@ -1,6 +1,6 @@
 from torch_datasets import *
 from torch_models import *
-from training import *
+from inference import *
 
 
 COLLECTION = {
@@ -9,20 +9,29 @@ COLLECTION = {
             'cfgclass':Kitti12BaseDataset,
             'class':Kitti12Config
         },
-
     },
     'models':{
         'FoundationStereoModel':{
             'cfgclass':FoundationStereoConfig,
             'class':FoundationStereoModel
         },
-
     },
-    'trainers':{
-        'BaseTrainer':{
-            'cfgclass':BaseTrainerConfig,
-            'class':BaseTrainer
+    'runners':{
+        'InferenceRunner':{
+            'cfgclass':InferenceRunnerConfig,
+            'class':InferenceRunner
         },
-
+        'EvaluationRunner':{
+            'cfgclass':EvaluationRunnerConfig,
+            'class':EvaluationRunner
+        },
+        'FoundationStereoEvaluationRunner':{
+            'cfgclass':EvaluationRunnerConfig,
+            'class':FoundationStereoEvaluationRunner
+        },
+        'LightStereoEvaluationRunner':{
+            'cfgclass':EvaluationRunnerConfig,
+            'class':LightStereoEvaluationRunner
+        },
     }
 }
